@@ -2,6 +2,12 @@ import os.path as osp
 from PIL import Image
 
 import torch.utils.data as data
+from utils.data_augmentation import (Compose,
+                                     Scale,
+                                     RandomRotation,
+                                     RandomMirror,
+                                     Resize,
+                                     Normalize_Tensor)
 
 
 def make_datapath_list(rootpath):
@@ -34,10 +40,87 @@ def make_datapath_list(rootpath):
     return train_img_list, train_anno_list, val_img_list, val_anno_list
 
 
+class DataTransform():
+    def __init__(self, input_size, color_mean, color_std):
+        self.data_transform = {
+            'train': Compose([
+                Scale(scale=[0.5, 1.5]),  # 画像の拡大
+                RandomRotation(angle=[-10, 10]),  # 回転
+                RandomMirror(),  # ランダムミラー
+                Resize(input_size),  # リサイズ(input_size)
+                Normalize_Tensor(color_mean, color_std)  # 色情報の標準化とテンソル化
+            ]),
+            'val': Compose([
+                Resize(input_size),  # リサイズ(input_size)
+                Normalize_Tensor(color_mean, color_std)  # 色情報の標準化とテンソル化
+            ])
+        }
+
+    def __call__(self, phase, img, anno_class_img):
+        return self.data_transform[phase](img, anno_class_img)
+
+
+class VOCDataset(data.Dataset):
+    def __init__(self, img_list, anno_list, phase, transform):
+        self.img_list = img_list
+        self.anno_list = anno_list
+        self.phase = phase
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.img_list)
+
+    def pull_item(self, index):
+        image_file_path = self.img_list[index]
+        img = Image.open(image_file_path)
+
+        anno_file_path = self.anno_list[index]
+        anno_class_img = Image.open(anno_file_path)
+
+        img, anno_class_img = self.transform(self.phase, img, anno_class_img)
+
+        return img, anno_class_img
+
+    def __getitem__(self, index):
+        img, anno_class_img = self.pull_item(index)
+        return img, anno_class_img
+
+
 if __name__ == '__main__':
     rootpath = './data/VOCdevkit/VOC2012/'
     train_img_list, train_anno_list, \
         val_img_list, val_anno_list = make_datapath_list(rootpath=rootpath)
 
-    print(train_img_list[0])
-    print(train_anno_list[0])
+    color_mean = (0.485, 0.456, 0.406)
+    color_std = (0.229, 0.224, 0.225)
+
+    train_dataset = VOCDataset(train_img_list,
+                               train_anno_list,
+                               phase='train',
+                               transform=DataTransform(input_size=475,
+                                                       color_mean=color_mean,
+                                                       color_std=color_std))
+
+    val_dataset = VOCDataset(val_img_list,
+                             val_anno_list,
+                             phase='val',
+                             transform=DataTransform(input_size=475,
+                                                     color_mean=color_mean,
+                                                     color_std=color_std))
+
+    # print(val_dataset.__getitem__(0)[0].shape)
+    # print(val_dataset.__getitem__(0)[1].shape)
+    # print(val_dataset.__getitem__(0))
+
+    batch_size = 8
+    train_dataloader = data.DataLoader(
+        train_dataset, batch_size=batch_size, shuffle=True)
+    val_dataloader = data.DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=False)
+
+    dataloaders_dict = {"train": train_dataloader, "val": val_dataloader}
+
+    batch_iterator = iter(dataloaders_dict["val"])
+    images, anno_class_images = next(batch_iterator)
+    print(images.size())
+    print(anno_class_images.size())
