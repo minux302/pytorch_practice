@@ -37,25 +37,25 @@ class PSPNet(nn.Module):
                                                       stride=1,
                                                       dilation=4)
 
-        self.pyramid_pooling = PyramidPooling(in_chanels=2048,
+        self.pyramid_pooling = PyramidPooling(in_channels=2048,
                                               pool_sizes=[6, 3, 2, 1],
                                               height=img_size_8,
                                               width=img_size_8)
 
         self.decode_feature = DecodePSPFeature(height=img_size,
                                                width=img_size,
-                                               n_classes=n_class)
+                                               n_classes=n_classes)
 
         self.aux = AuxiliaryPSPlayers(in_channels=1024,
                                       height=img_size,
                                       width=img_size,
-                                      n_class=n_classes)
+                                      n_classes=n_classes)
 
     def forward(self, x):
         x = self.feature_conv(x)
         x = self.feature_res_1(x)
         x = self.feature_res_2(x)
-        x = self.feature_res_dilated_res_1(x)
+        x = self.feature_dilated_res_1(x)
         output_aux = self.aux(x)
 
         x = self.feature_dilated_res_2(x)
@@ -69,8 +69,8 @@ class conv2DBatchNormRelu(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding,
                  dilation, bias):
         super(conv2DBatchNormRelu, self).__init__()
-        self.conv = nn.Conv2d(in_channels, out_channels,
-                              kernel_size, stride, padding, dilation, bias=bias)
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size,
+                              stride, padding, dilation, bias=bias)
         self.batchnorm = nn.BatchNorm2d(out_channels)
         self.relu = nn.ReLU(inplace=True)
 
@@ -78,7 +78,6 @@ class conv2DBatchNormRelu(nn.Module):
         x = self.conv(x)
         x = self.batchnorm(x)
         outputs = self.relu(x)
-
         return outputs
 
 
@@ -126,8 +125,8 @@ class conv2DBatchNorm(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding,
                  dilation, bias):
         super(conv2DBatchNorm, self).__init__()
-        self.conv = nn.Conv(in_channels, out_channels,
-                            kernel_size, stride, padding, dilation, bias=bias)
+        self.conv = nn.Conv2d(in_channels, out_channels,
+                              kernel_size, stride, padding, dilation, bias=bias)
         self.batchnorm = nn.BatchNorm2d(out_channels)
 
     def forward(self, x):
@@ -137,7 +136,8 @@ class conv2DBatchNorm(nn.Module):
 
 
 class bottleNeckPSP(nn.Module):
-    def __init__(self, in_channels, mid_channels, out_channels, stride, dilation):
+    def __init__(self, in_channels, mid_channels,
+                 out_channels, stride, dilation):
         super(bottleNeckPSP, self).__init__()
 
         self.cbr_1 = conv2DBatchNormRelu(in_channels=in_channels,
@@ -157,7 +157,7 @@ class bottleNeckPSP(nn.Module):
         self.cb_3 = conv2DBatchNorm(in_channels=mid_channels,
                                     out_channels=out_channels,
                                     kernel_size=1,
-                                    stride=stride,
+                                    stride=1,
                                     padding=0,
                                     dilation=1,
                                     bias=False)
@@ -174,30 +174,31 @@ class bottleNeckPSP(nn.Module):
         conv = self.cb_3(self.cbr_2(self.cbr_1(x)))
         residual = self.cb_residual(x)
         return self.relu(conv + residual)
-        
+
 
 class bottleNeckIdentifyPSP(nn.Module):
-    def __init__(self, in_channels, mid_channels, out_channels, stride, dilation):
-        super(bottleNeckPSP, self).__init__()
+    def __init__(self, in_channels, mid_channels,
+                 stride, dilation):
+        super(bottleNeckIdentifyPSP, self).__init__()
 
-        self.cbr_1 = conv2dbatchnormrelu(in_channels=in_channels,
+        self.cbr_1 = conv2DBatchNormRelu(in_channels=in_channels,
                                          out_channels=mid_channels,
                                          kernel_size=1,
                                          stride=1,
                                          padding=0,
                                          dilation=1,
-                                         bias=false)
+                                         bias=False)
         self.cbr_2 = conv2DBatchNormRelu(in_channels=mid_channels,
                                          out_channels=mid_channels,
                                          kernel_size=3,
-                                         stride=stride,
+                                         stride=1,
                                          padding=1,  # ??
                                          dilation=1,
                                          bias=False)
         self.cb_3 = conv2DBatchNorm(in_channels=mid_channels,
-                                    out_channels=out_channels,
+                                    out_channels=in_channels,
                                     kernel_size=1,
-                                    stride=stride,
+                                    stride=1,
                                     padding=0,
                                     dilation=1,
                                     bias=False)
@@ -256,7 +257,7 @@ class PyramidPooling(nn.Module):
                                          padding=0,
                                          dilation=1,
                                          bias=False)
- 
+
         self.avpool_3 = nn.AdaptiveAvgPool2d(output_size=pool_sizes[2])
         self.cbr_3 = conv2DBatchNormRelu(in_channels=in_channels,
                                          out_channels=out_channels,
@@ -265,7 +266,7 @@ class PyramidPooling(nn.Module):
                                          padding=0,
                                          dilation=1,
                                          bias=False)
- 
+
         self.avpool_4 = nn.AdaptiveAvgPool2d(output_size=pool_sizes[3])
         self.cbr_4 = conv2DBatchNormRelu(in_channels=in_channels,
                                          out_channels=out_channels,
@@ -274,7 +275,7 @@ class PyramidPooling(nn.Module):
                                          padding=0,
                                          dilation=1,
                                          bias=False)
- 
+
     def forward(self, x):
         out1 = self.cbr_1(self.avpool_1(x))
         out1 = F.interpolate(out1, size=(self.height, self.width),
@@ -295,3 +296,77 @@ class PyramidPooling(nn.Module):
         output = torch.cat([x, out1, out2, out3, out4], dim=1)
 
         return output
+
+
+class DecodePSPFeature(nn.Module):
+    def __init__(self, height, width, n_classes):
+        super(DecodePSPFeature, self).__init__()
+
+        self.height = height
+        self.width = width
+
+        self.cbr = conv2DBatchNormRelu(in_channels=4096,
+                                       out_channels=512,
+                                       kernel_size=3,
+                                       stride=1,
+                                       padding=1,
+                                       dilation=1,
+                                       bias=False)
+        self.dropout = nn.Dropout2d(p=0.1)
+        self.classification = nn.Conv2d(in_channels=512,
+                                        out_channels=n_classes,
+                                        kernel_size=1,
+                                        stride=1,
+                                        padding=0)
+
+    def forward(self, x):
+        x = self.cbr(x)
+        x = self.dropout(x)
+        x = self.classification(x)
+        output = F.interpolate(x,
+                               size=(self.height, self.width),
+                               mode="bilinear",
+                               align_corners=True)
+        return output
+
+
+class AuxiliaryPSPlayers(nn.Module):
+    def __init__(self, in_channels, height, width, n_classes):
+        super(AuxiliaryPSPlayers, self).__init__()
+
+        self.height = height
+        self.width = width
+
+        self.cbr = conv2DBatchNormRelu(in_channels=in_channels,
+                                       out_channels=256,
+                                       kernel_size=3,
+                                       stride=1,
+                                       padding=1,
+                                       dilation=1,
+                                       bias=False)
+        self.dropout = nn.Dropout2d(p=0.1)
+        self.classification = nn.Conv2d(in_channels=256,
+                                        out_channels=n_classes,
+                                        kernel_size=1,
+                                        stride=1,
+                                        padding=0)
+
+    def forward(self, x):
+        x = self.cbr(x)
+        x = self.dropout(x)
+        x = self.classification(x)
+        output = F.interpolate(x,
+                               size=(self.height, self.width),
+                               mode="bilinear",
+                               align_corners=True)
+        return output
+
+
+if __name__ == '__main__':
+    net = PSPNet(n_classes=21)
+    # print(net)
+    batch_size = 2
+    dummy_img = torch.rand(batch_size, 3, 475, 475)
+
+    outputs = net(dummy_img)
+    print(outputs)
