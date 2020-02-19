@@ -192,8 +192,8 @@ class bottleNeckIdentifyPSP(nn.Module):
                                          out_channels=mid_channels,
                                          kernel_size=3,
                                          stride=1,
-                                         padding=1,  # ??
-                                         dilation=1,
+                                         padding=dilation,  # ??
+                                         dilation=dilation,
                                          bias=False)
         self.cb_3 = conv2DBatchNorm(in_channels=mid_channels,
                                     out_channels=in_channels,
