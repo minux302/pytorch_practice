@@ -2,12 +2,20 @@ import os.path as osp
 from PIL import Image
 
 import torch.utils.data as data
-from data_augmentation import (Compose,
+# from data_augmentation import (Compose,
+#                                 Scale,
+#                                 RandomRotation,
+#                                 RandomMirror,
+#                                 Resize,
+#                                 Normalize_Tensor)
+from utils.data_augmentation import (Compose,
                                 Scale,
                                 RandomRotation,
                                 RandomMirror,
                                 Resize,
                                 Normalize_Tensor)
+
+
 
 
 def make_datapath_list(rootpath):
