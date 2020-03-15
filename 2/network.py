@@ -154,7 +154,7 @@ def nm_suppression(boxes, scores, overlap=0.45, top_k=200):
     scores: [num_bbox]
     """
     count = 0
-    keep = scores.new(scores.size(0)).zero_().log()
+    keep = scores.new(scores.size(0)).zero_().long()
 
     x1 = boxes[:, 0]
     y1 = boxes[:, 1]
@@ -215,6 +215,7 @@ class Detect(Function):
     def __init__(self, conf_thresh=0.01, top_k=200, nms_thresh=0.45):
         self.softmax = nn.Softmax(dim=-1)
         self.conf_thresh = conf_thresh
+        self.nms_thresh = nms_thresh
         self.top_k = top_k
 
     def forward(self, loc_data, conf_data, dbox_list):
@@ -236,7 +237,7 @@ class Detect(Function):
             conf_scores = conf_preds[i].clone()
 
             for cl in range(1, num_classes):
-                c_mask = conf_scores[cl].gt(self.conf_threth)  # ([8732])
+                c_mask = conf_scores[cl].gt(self.conf_thresh)  # ([8732])
                 scores = conf_scores[cl][c_mask]
 
                 if scores.nelement() == 0:
